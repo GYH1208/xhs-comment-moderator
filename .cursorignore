@@ -1,0 +1,11 @@
+__pycache__/
+xhs_monitor_reports*/
+xhs_monitor_state*.json
+xhs_moderation_report.csv
+xhs_moderation_report.json
+xhs_ocr_raw.txt
+xhs_browser_screenshots/
+.xhs_browser_profile/
+*.docx
+*.rtf
+*.zip

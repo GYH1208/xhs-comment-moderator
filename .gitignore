@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+
+# Generated reports and monitor state
+xhs_moderation_report.csv
+xhs_moderation_report.json
+xhs_ocr_comments.csv
+xhs_ocr_raw.txt
+xhs_monitor_state*.json
+xhs_monitor_reports*/
+xhs_browser_comments.csv
+xhs_browser_screenshots/
+.xhs_browser_profile/
+
+# Local user config
+xhs_monitor_config.json
+
+# Screenshot inputs
+screenshots/

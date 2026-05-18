@@ -1,0 +1,12 @@
+{
+  "interval_seconds": 300,
+  "state_file": "xhs_monitor_state.json",
+  "output_dir": "xhs_monitor_reports",
+  "posts": [
+    {
+      "name": "example_post",
+      "url": "https://www.xiaohongshu.com/example/1",
+      "source": "sample_xhs_comments.csv"
+    }
+  ]
+}
