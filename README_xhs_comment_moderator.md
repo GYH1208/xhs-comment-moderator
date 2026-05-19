@@ -171,6 +171,14 @@ JSON 可以是数组：
 $env:DEEPSEEK_API_KEY="你的 DeepSeek API Key"
 ```
 
+或者在项目根目录新建 `.env` 文件：
+
+```env
+DEEPSEEK_API_KEY=你的 DeepSeek API Key
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+```
+
 然后运行：
 
 ```powershell

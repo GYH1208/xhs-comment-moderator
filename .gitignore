@@ -4,6 +4,8 @@ __pycache__/
 # Generated reports and monitor state
 xhs_moderation_report.csv
 xhs_moderation_report.json
+xhs_*moderation_report.csv
+xhs_*moderation_report.json
 xhs_ocr_comments.csv
 xhs_ocr_raw.txt
 xhs_monitor_state*.json
@@ -14,6 +16,9 @@ xhs_browser_screenshots/
 
 # Local user config
 xhs_monitor_config.json
+.env
+.env.local
+.env.*.local
 
 # Screenshot inputs
 screenshots/

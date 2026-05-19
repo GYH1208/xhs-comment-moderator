@@ -20,6 +20,23 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+def load_local_env(path: Path | None = None) -> None:
+    """Load simple KEY=VALUE pairs from a local .env file if present."""
+    env_path = path or Path.cwd() / ".env"
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
 TEXT_COLUMNS = ("comment", "content", "text", "评论", "评论内容", "内容")
 AUTHOR_COLUMNS = ("author", "user", "nickname", "用户名", "昵称", "用户")
 URL_COLUMNS = ("url", "note_url", "link", "笔记链接", "链接")
@@ -682,6 +699,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    load_local_env()
     args = parse_args()
     comments = load_comments(args.input)
     llm_moderator = None
