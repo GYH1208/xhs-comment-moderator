@@ -19,6 +19,17 @@
   <div><strong>{{ job.clean_count }}</strong><span>未命中</span></div>
 </div>
 
+{% if job.model_status or job.warning %}
+<section class="section compact-section">
+  {% if job.model_status %}
+    <p class="inline-note"><strong>模型状态：</strong>{{ job.model_status }}</p>
+  {% endif %}
+  {% if job.warning %}
+    <p class="inline-warning">{{ job.warning }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="section">
   <h2>优先处理</h2>
   {% if risky_rows %}

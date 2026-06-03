@@ -12,6 +12,11 @@
 </section>
 
 <form class="start-form" action="{{ url_for('start_job') }}" method="post">
+  <div class="status-strip">
+    <span>模型状态</span>
+    <strong>{{ model_status }}</strong>
+    <a href="{{ url_for('model_settings_page') }}">配置</a>
+  </div>
   <label for="url">小红书帖子链接</label>
   <div class="url-row">
     <input id="url" name="url" type="url" placeholder="https://www.xiaohongshu.com/..." required>

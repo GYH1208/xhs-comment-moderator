@@ -121,6 +121,15 @@ input {
   padding: 0 14px;
 }
 
+select {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 17px;
+  min-height: 48px;
+  padding: 0 14px;
+}
+
 button,
 .button-link {
   background: var(--primary);
@@ -141,8 +150,30 @@ button:hover,
   background: var(--primary-dark);
 }
 
+.secondary-button {
+  background: #344054;
+}
+
+.secondary-button:hover {
+  background: #1d2939;
+}
+
 .section {
   margin-top: 24px;
+}
+
+.compact-section {
+  padding: 18px 24px;
+}
+
+.inline-note,
+.inline-warning {
+  margin: 0;
+}
+
+.inline-warning {
+  color: var(--warning);
+  margin-top: 8px;
 }
 
 .section-head,
@@ -185,6 +216,54 @@ button:hover,
   gap: 8px;
   margin: 22px 0;
   padding: 18px;
+}
+
+.status-strip {
+  align-items: center;
+  background: #f9fafb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 12px 14px;
+}
+
+.status-strip span,
+.help-text {
+  color: var(--muted);
+}
+
+.status-strip a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.settings-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.settings-form input[type="checkbox"] {
+  min-height: auto;
+}
+
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.help-text {
+  font-size: 14px;
+  margin: -4px 0 8px;
+}
+
+.test-form {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 20px;
 }
 
 .status-opening,

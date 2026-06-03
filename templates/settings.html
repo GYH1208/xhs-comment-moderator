@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}模型配置 - 小红书评论检测{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <p class="eyebrow">模型配置</p>
+  <h1>设置语义复核模型</h1>
+  <p class="lede">保存后，后续检测会按这里的配置调用模型。API Key 只保存在本机。</p>
+
+  <form class="settings-form" action="{{ url_for('save_model_settings_page') }}" method="post">
+    <label class="check-row">
+      <input type="checkbox" name="enabled" {% if settings.enabled %}checked{% endif %}>
+      <span>启用模型复核</span>
+    </label>
+
+    <label for="api_key">API Key</label>
+    <input id="api_key" name="api_key" type="password" placeholder="{{ masked_api_key }}">
+    <p class="help-text">已保存：{{ masked_api_key }}。留空表示继续使用已保存的 Key。</p>
+
+    <label for="model">模型名</label>
+    <input id="model" name="model" type="text" value="{{ settings.model }}" required>
+
+    <label for="base_url">Base URL</label>
+    <input id="base_url" name="base_url" type="url" value="{{ settings.base_url }}" required>
+
+    <label for="llm_mode">复核范围</label>
+    <select id="llm_mode" name="llm_mode">
+      <option value="uncertain" {% if settings.llm_mode == "uncertain" %}selected{% endif %}>疑似风险和低中风险评论</option>
+      <option value="risky" {% if settings.llm_mode == "risky" %}selected{% endif %}>中高风险评论</option>
+      <option value="all" {% if settings.llm_mode == "all" %}selected{% endif %}>全部评论</option>
+    </select>
+
+    <label for="max_llm_comments">最大复核条数</label>
+    <input id="max_llm_comments" name="max_llm_comments" type="number" min="0" value="{{ settings.max_llm_comments }}">
+
+    <div class="actions">
+      <button type="submit">保存配置</button>
+    </div>
+  </form>
+
+  <form class="test-form" action="{{ url_for('test_model_settings') }}" method="post">
+    <button type="submit" class="secondary-button">测试连接</button>
+  </form>
+</section>
+{% endblock %}

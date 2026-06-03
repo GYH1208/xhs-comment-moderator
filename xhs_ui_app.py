@@ -29,9 +29,19 @@ import xhs_comment_moderator as moderator
 
 DATA_DIR = Path("xhs_ui_data")
 JOBS_DIR = DATA_DIR / "jobs"
+SETTINGS_PATH = DATA_DIR / "settings.json"
 PROFILE_DIR = Path(".xhs_browser_profile")
 RISK_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "feedback": 4, "clean": 5}
 RISKY_LEVELS = {"critical", "high", "medium", "low"}
+LLM_MODES = {"all", "uncertain", "risky"}
+DEFAULT_MODEL_SETTINGS = {
+    "enabled": False,
+    "api_key": "",
+    "model": "deepseek-v4-flash",
+    "base_url": "https://api.deepseek.com",
+    "llm_mode": "uncertain",
+    "max_llm_comments": 20,
+}
 
 app = Flask(__name__)
 app.secret_key = "xhs-local-ui"
@@ -83,6 +93,83 @@ def save_json(path: Path, data: Any) -> None:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
+def load_model_settings() -> dict[str, Any]:
+    saved = load_json(SETTINGS_PATH, {})
+    if not isinstance(saved, dict):
+        saved = {}
+    settings = dict(DEFAULT_MODEL_SETTINGS)
+    settings.update({key: saved[key] for key in settings.keys() if key in saved})
+    if settings["llm_mode"] not in LLM_MODES:
+        settings["llm_mode"] = DEFAULT_MODEL_SETTINGS["llm_mode"]
+    try:
+        settings["max_llm_comments"] = int(settings["max_llm_comments"])
+    except (TypeError, ValueError):
+        settings["max_llm_comments"] = DEFAULT_MODEL_SETTINGS["max_llm_comments"]
+    if settings["max_llm_comments"] < 0:
+        settings["max_llm_comments"] = 0
+    settings["enabled"] = bool(settings["enabled"])
+    return settings
+
+
+def mask_api_key(api_key: str) -> str:
+    if not api_key:
+        return "未设置"
+    if len(api_key) <= 8:
+        return "****"
+    return f"{api_key[:3]}****{api_key[-4:]}"
+
+
+def parse_model_settings_form(form: Any, current: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    llm_mode = form.get("llm_mode", DEFAULT_MODEL_SETTINGS["llm_mode"]).strip()
+    if llm_mode not in LLM_MODES:
+        return current, "复核范围无效。"
+
+    base_url = form.get("base_url", DEFAULT_MODEL_SETTINGS["base_url"]).strip().rstrip("/")
+    if not re.match(r"^https?://", base_url):
+        return current, "Base URL 需要以 http:// 或 https:// 开头。"
+
+    try:
+        max_llm_comments = int(form.get("max_llm_comments", DEFAULT_MODEL_SETTINGS["max_llm_comments"]))
+    except (TypeError, ValueError):
+        return current, "最大复核条数必须是数字。"
+    if max_llm_comments < 0:
+        return current, "最大复核条数不能小于 0。"
+
+    api_key = form.get("api_key", "").strip() or str(current.get("api_key", ""))
+    settings = {
+        "enabled": form.get("enabled") == "on",
+        "api_key": api_key,
+        "model": form.get("model", DEFAULT_MODEL_SETTINGS["model"]).strip()
+        or DEFAULT_MODEL_SETTINGS["model"],
+        "base_url": base_url,
+        "llm_mode": llm_mode,
+        "max_llm_comments": max_llm_comments,
+    }
+    if settings["enabled"] and not settings["api_key"]:
+        return current, "启用模型复核前需要填写 API Key。"
+    return settings, None
+
+
+def save_model_settings(settings: dict[str, Any]) -> None:
+    save_json(SETTINGS_PATH, settings)
+
+
+def model_status_label(settings: dict[str, Any]) -> str:
+    if settings.get("enabled") and settings.get("api_key"):
+        return f"已启用模型复核：{settings.get('model')}"
+    return "仅使用本地规则"
+
+
+def build_llm_moderator(settings: dict[str, Any]) -> moderator.LlmModerator | None:
+    if not settings.get("enabled") or not settings.get("api_key"):
+        return None
+    return moderator.LlmModerator(
+        api_key=str(settings["api_key"]),
+        model=str(settings["model"]),
+        base_url=str(settings["base_url"]),
+    )
+
+
 def load_job(job_id: str) -> dict[str, Any]:
     job = load_json(job_json_path(job_id), None)
     if not isinstance(job, dict):
@@ -124,12 +211,32 @@ def sort_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def classify_comments(comments: list[str], url: str) -> list[dict[str, Any]]:
+def classify_comments(
+    comments: list[str],
+    url: str,
+    settings: dict[str, Any] | None = None,
+    llm_factory: Any = build_llm_moderator,
+) -> tuple[list[dict[str, Any]], str | None]:
     comment_objects = [
         moderator.Comment(index=index, text=text, url=url)
         for index, text in enumerate(comments, start=1)
     ]
-    return sort_rows(moderator.build_rows(comment_objects))
+    settings = settings or load_model_settings()
+    llm_moderator = llm_factory(settings)
+    if not llm_moderator:
+        return sort_rows(moderator.build_rows(comment_objects)), None
+
+    try:
+        rows = moderator.build_rows_with_options(
+            comment_objects,
+            llm_moderator=llm_moderator,
+            llm_mode=str(settings["llm_mode"]),
+            max_llm_comments=int(settings["max_llm_comments"]),
+        )
+        return sort_rows(rows), None
+    except Exception as exc:
+        rows = moderator.build_rows(comment_objects)
+        return sort_rows(rows), f"模型复核失败，已使用本地规则生成结果：{exc}"
 
 
 def create_job(url: str) -> dict[str, Any]:
@@ -176,7 +283,8 @@ def run_job(job_id: str) -> None:
         comments = collector.collect()
 
         update_job(job_id, status="reviewing", message="正在识别风险评论")
-        rows = classify_comments(comments, job["url"])
+        model_settings = load_model_settings()
+        rows, warning = classify_comments(comments, job["url"], settings=model_settings)
         counts = count_rows(rows)
         save_json(rows_json_path(job_id), rows)
         moderator.write_csv(report_path(job_id), rows)
@@ -184,6 +292,8 @@ def run_job(job_id: str) -> None:
             job_id,
             status="done",
             message="检测完成",
+            model_status=model_status_label(model_settings),
+            warning=warning or "",
             **counts,
         )
     except Exception as exc:
@@ -219,7 +329,12 @@ def load_rows(job_id: str) -> list[dict[str, Any]]:
 
 @app.get("/")
 def index() -> str:
-    return render_template("index.html", recent_jobs=list_jobs()[:5])
+    settings = load_model_settings()
+    return render_template(
+        "index.html",
+        recent_jobs=list_jobs()[:5],
+        model_status=model_status_label(settings),
+    )
 
 
 @app.post("/jobs")
@@ -280,6 +395,53 @@ def download_report(job_id: str) -> Any:
 @app.get("/history")
 def history() -> str:
     return render_template("history.html", jobs=list_jobs())
+
+
+@app.get("/settings/model")
+def model_settings_page() -> str:
+    settings = load_model_settings()
+    return render_template(
+        "settings.html",
+        settings=settings,
+        masked_api_key=mask_api_key(str(settings.get("api_key", ""))),
+    )
+
+
+@app.post("/settings/model")
+def save_model_settings_page() -> Any:
+    current = load_model_settings()
+    settings, error = parse_model_settings_form(request.form, current)
+    if error:
+        flash(error)
+        return redirect(url_for("model_settings_page"))
+    save_model_settings(settings)
+    flash("模型配置已保存。")
+    return redirect(url_for("model_settings_page"))
+
+
+@app.post("/settings/model/test")
+def test_model_settings() -> Any:
+    settings = load_model_settings()
+    llm_moderator = build_llm_moderator(settings)
+    if not llm_moderator:
+        flash("请先启用模型复核并保存 API Key。")
+        return redirect(url_for("model_settings_page"))
+
+    try:
+        comment = moderator.Comment(index=1, text="测试连接")
+        decision = moderator.Decision(
+            risk_level="clean",
+            score=0,
+            categories=["未命中"],
+            action="无需处理",
+            reasons=["连接测试"],
+        )
+        llm_moderator.review(comment, decision)
+    except Exception as exc:
+        flash(f"模型连接测试失败：{exc}")
+    else:
+        flash("模型连接测试成功。")
+    return redirect(url_for("model_settings_page"))
 
 
 if __name__ == "__main__":

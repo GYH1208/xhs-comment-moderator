@@ -13,14 +13,17 @@ class XhsUiAppTest(unittest.TestCase):
         self.addCleanup(self.tmpdir.cleanup)
         self.old_jobs_dir = xhs_ui_app.JOBS_DIR
         self.old_data_dir = xhs_ui_app.DATA_DIR
+        self.old_settings_path = xhs_ui_app.SETTINGS_PATH
         xhs_ui_app.DATA_DIR = Path(self.tmpdir.name) / "data"
         xhs_ui_app.JOBS_DIR = xhs_ui_app.DATA_DIR / "jobs"
+        xhs_ui_app.SETTINGS_PATH = xhs_ui_app.DATA_DIR / "settings.json"
         xhs_ui_app.app.config.update(TESTING=True)
         self.client = xhs_ui_app.app.test_client()
 
     def tearDown(self) -> None:
         xhs_ui_app.DATA_DIR = self.old_data_dir
         xhs_ui_app.JOBS_DIR = self.old_jobs_dir
+        xhs_ui_app.SETTINGS_PATH = self.old_settings_path
 
     def save_finished_job(self) -> str:
         job_id = "a" * 32
@@ -101,6 +104,105 @@ class XhsUiAppTest(unittest.TestCase):
                 "feedback_count": 1,
             },
         )
+
+    def test_model_settings_default_to_local_rules(self) -> None:
+        settings = xhs_ui_app.load_model_settings()
+        self.assertFalse(settings["enabled"])
+        self.assertEqual(settings["model"], "deepseek-v4-flash")
+        self.assertEqual(settings["base_url"], "https://api.deepseek.com")
+        self.assertEqual(settings["llm_mode"], "uncertain")
+        self.assertEqual(settings["max_llm_comments"], 20)
+        self.assertEqual(settings["api_key"], "")
+
+    def test_model_settings_save_masks_api_key_on_page(self) -> None:
+        response = self.client.post(
+            "/settings/model",
+            data={
+                "enabled": "on",
+                "api_key": "sk-test-secret",
+                "model": "deepseek-v4-flash",
+                "base_url": "https://api.deepseek.com",
+                "llm_mode": "risky",
+                "max_llm_comments": "12",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("sk-****cret".encode(), response.data)
+        self.assertNotIn("sk-test-secret".encode(), response.data)
+        settings = xhs_ui_app.load_model_settings()
+        self.assertTrue(settings["enabled"])
+        self.assertEqual(settings["api_key"], "sk-test-secret")
+        self.assertEqual(settings["llm_mode"], "risky")
+        self.assertEqual(settings["max_llm_comments"], 12)
+
+    def test_invalid_model_review_mode_is_rejected(self) -> None:
+        response = self.client.post(
+            "/settings/model",
+            data={
+                "enabled": "on",
+                "api_key": "sk-test-secret",
+                "model": "deepseek-v4-flash",
+                "base_url": "https://api.deepseek.com",
+                "llm_mode": "bad-mode",
+                "max_llm_comments": "12",
+            },
+            follow_redirects=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("复核范围无效".encode(), response.data)
+        self.assertFalse(xhs_ui_app.SETTINGS_PATH.exists())
+
+    def test_classify_comments_uses_enabled_model_settings(self) -> None:
+        class FakeModerator:
+            def review(self, comment, rule_decision):
+                return {
+                    "risk_level": "medium",
+                    "confidence": 0.9,
+                    "categories": ["模型判断"],
+                    "action": "人工复核",
+                    "reason": "测试模型复核",
+                }
+
+        settings = {
+            "enabled": True,
+            "api_key": "sk-test-secret",
+            "model": "deepseek-v4-flash",
+            "base_url": "https://api.deepseek.com",
+            "llm_mode": "all",
+            "max_llm_comments": 1,
+        }
+        rows, warning = xhs_ui_app.classify_comments(
+            ["这句话表面正常"],
+            "https://www.xiaohongshu.com/example/1",
+            settings=settings,
+            llm_factory=lambda _: FakeModerator(),
+        )
+        self.assertIsNone(warning)
+        self.assertEqual(rows[0]["llm_risk_level"], "medium")
+        self.assertIn("模型判断", rows[0]["categories"])
+
+    def test_classify_comments_falls_back_when_model_fails(self) -> None:
+        class FailingModerator:
+            def review(self, comment, rule_decision):
+                raise RuntimeError("模型不可用")
+
+        settings = {
+            "enabled": True,
+            "api_key": "sk-test-secret",
+            "model": "deepseek-v4-flash",
+            "base_url": "https://api.deepseek.com",
+            "llm_mode": "all",
+            "max_llm_comments": 1,
+        }
+        rows, warning = xhs_ui_app.classify_comments(
+            ["谢谢分享"],
+            "https://www.xiaohongshu.com/example/1",
+            settings=settings,
+            llm_factory=lambda _: FailingModerator(),
+        )
+        self.assertEqual(rows[0]["risk_level"], "clean")
+        self.assertIn("模型复核失败", warning)
 
 
 if __name__ == "__main__":
