@@ -1,78 +1,109 @@
-# Xiaohongshu Comment Moderator
+# 小红书评论检测助手
 
-一个本地优先的小红书评论采集、审核和监控工具。它可以把评论整理成 CSV，使用规则和 DeepSeek 语义复核识别辱骂、威胁、广告引流、造谣、嘲讽/阴阳怪气等风险，并输出可复核的处理报告。
+一个本地运行的小红书评论采集和风险审核工具。给同事使用时，可以直接打开本地网页，粘贴小红书帖子链接，按提示登录或打开评论区，然后查看恶意评论检测结果。
 
-这个项目默认不调用小红书私有接口，不绕验证码，不自动删除评论。它更适合作为评论风控助手：自动采集/识别/留痕，最终处置由人确认。
+它默认不调用小红书私有接口，不绕验证码，不自动删除评论。它的定位是评论风控助手：自动采集、自动识别、生成留痕报告，最终处理仍由人确认。
 
-## 功能
+## 适合做什么
 
-- 从 CSV、JSON、TXT 读取评论并生成风险审核报告
-- 浏览器自动化打开帖子链接，尝试提取网页端可见评论
-- 保存浏览器滚动截图，作为 OCR 兜底输入
-- 对评论截图做 OCR，转换成评论 CSV
-- 定时监控评论来源，只报告新增评论
-- 本地规则识别明显辱骂、威胁、隐私泄露、广告引流等
-- 本地弱语义规则识别反讽、阴阳怪气、恶意揣测
-- 可选 DeepSeek 大模型语义复核
+- 通过小红书帖子链接采集网页端可见评论
+- 自动识别辱骂、威胁、广告引流、隐私泄露、造谣、嘲讽/阴阳怪气等风险
+- 在本地网页里查看需要优先处理的评论
+- 导出 CSV 报告，方便留痕和复核
+- 可选接入 DeepSeek 做语义复核
+- 保留命令行、OCR、定时监控等高级用法
+
+## 给同事使用：本地网页
+
+### 1. 安装依赖
+
+建议使用 Python 3.10 或更高版本。
+
+```powershell
+pip install -r .\requirements.txt
+python -m playwright install chromium
+```
+
+### 2. 启动网页
+
+```powershell
+python .\xhs_ui_app.py
+```
+
+然后在浏览器打开：
+
+```text
+http://127.0.0.1:5000
+```
+
+### 3. 检测一个帖子
+
+1. 在网页里粘贴小红书帖子链接。
+2. 点击“开始检测”。
+3. 系统会弹出一个浏览器窗口。
+4. 如果需要登录、验证或手动打开评论区，请先在弹出的浏览器里处理好。
+5. 回到网页，点击“我已打开评论区，继续检测”。
+6. 等待系统自动滚动、采集评论、识别风险。
+7. 在结果页查看需要优先处理的评论，也可以导出 CSV 报告。
+
+检测历史、滚动截图和报告会保存在本地 `xhs_ui_data/` 目录。这个目录已加入 `.gitignore`，不会提交到仓库。
+
+## 页面说明
+
+- **新检测**：粘贴帖子链接并开始检测。
+- **检测中**：显示当前步骤。需要人工登录或打开评论区时，页面会提示你继续。
+- **检测结果**：优先展示风险评论，普通反馈和未命中评论放在折叠区。
+- **历史记录**：查看最近检测过的帖子和结果。
+
+风险评论会按严重程度排序：`critical`、`high`、`medium`、`low`。
+
+## 常见问题
+
+### 没有弹出浏览器
+
+先确认安装了 Playwright 浏览器：
+
+```powershell
+python -m playwright install chromium
+```
+
+### 页面一直停在等待确认
+
+这是正常流程。请在弹出的浏览器里登录小红书、处理验证，并把页面打开到评论区，然后回到本地网页点击“我已打开评论区，继续检测”。
+
+### 没有采集到评论
+
+可能原因：
+
+- 没有登录小红书
+- 页面没有打开到评论区
+- 网页端没有展示评论
+- 页面结构变化导致采集规则没有命中
+
+可以重新检测一次，并确保评论区在弹出的浏览器里可见。
+
+### 会不会自动删除评论
+
+不会。这个工具只做采集、识别和报告，不会自动删除、举报或拉黑。
 
 ## 项目结构
 
 ```text
-xhs_comment_moderator.py        # 评论审核主脚本
-xhs_browser_collect.py          # 浏览器自动化采集网页可见评论
 xhs_ui_app.py                   # 本地网页 UI，适合同事使用
+xhs_browser_collect.py          # 浏览器自动化采集网页可见评论
+xhs_comment_moderator.py        # 评论审核核心逻辑
 xhs_ocr_to_comments.py          # 评论截图 OCR 转 CSV
 xhs_monitor.py                  # 定时监控本地评论来源
 xhs_monitor_config.example.json # 监控配置示例
 sample_xhs_comments.csv         # 示例评论数据
 .env.example                    # DeepSeek 配置模板
 requirements.txt                # Python 依赖
+templates/                      # 网页模板
+static/                         # 网页样式和脚本
+tests/                          # 自动化测试
 ```
 
-## 安装
-
-建议使用 Python 3.10 或更高版本。
-
-```powershell
-pip install -r .\requirements.txt
-```
-
-如果要使用浏览器自动化：
-
-```powershell
-python -m playwright install chromium
-```
-
-如果要使用 OCR，需要额外安装 Tesseract OCR 主程序和中文简体语言包 `chi_sim`。Python 包 `pillow` 和 `pytesseract` 已在 `requirements.txt` 中。
-
-## 快速开始
-
-### 给同事使用：本地网页
-
-启动本地网页：
-
-```powershell
-python .\xhs_ui_app.py
-```
-
-然后打开：
-
-```text
-http://127.0.0.1:5000
-```
-
-使用流程：
-
-1. 在网页里粘贴小红书帖子链接。
-2. 点击“开始检测”。
-3. 系统会弹出一个浏览器窗口。如果需要登录、验证或手动打开评论区，请先在弹出的浏览器里处理好。
-4. 回到网页，点击“我已打开评论区，继续检测”。
-5. 等待系统自动滚动采集评论并生成审核结果。
-6. 在结果页查看需要优先处理的评论，必要时导出 CSV 报告。
-
-检测历史、截图和报告会保存在本地 `xhs_ui_data/` 目录，不会提交到 GitHub。
-
-### 命令行审核
+## 高级用法：命令行审核
 
 用示例评论跑一次本地审核：
 
@@ -80,7 +111,7 @@ http://127.0.0.1:5000
 python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_report.csv
 ```
 
-输出报告会包含：
+报告字段包括：
 
 ```text
 risk_level
@@ -97,7 +128,7 @@ llm_reason
 
 不开 `--llm` 时，`llm_*` 字段为空。
 
-## 配置 DeepSeek
+## 配置 DeepSeek 语义复核
 
 复制模板：
 
@@ -112,8 +143,6 @@ DEEPSEEK_API_KEY=你的 DeepSeek API Key
 DEEPSEEK_MODEL=deepseek-v4-flash
 DEEPSEEK_BASE_URL=https://api.deepseek.com
 ```
-
-`.env` 已在 `.gitignore` 中，不会提交到 GitHub。
 
 开启大模型复核：
 
@@ -139,7 +168,9 @@ python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_
 - `uncertain`：复核本地规则认为低到中风险的评论
 - `risky`：复核本地规则已判定为中高风险的评论
 
-## 浏览器采集评论
+注意：开启大模型后，评论文本会发送到模型服务商。评论里如果有手机号、地址、身份证等隐私信息，建议先脱敏再调用。
+
+## 高级用法：浏览器采集评论
 
 直接给帖子链接，脚本会打开浏览器、等待你登录或确认页面，然后滚动并尝试读取网页端可见评论：
 
@@ -157,14 +188,12 @@ python .\xhs_browser_collect.py "你的小红书帖子链接" -o .\xhs_browser_c
 然后审核采集结果：
 
 ```powershell
-python .\xhs_comment_moderator.py .\xhs_browser_comments.csv -o .\xhs_browser_moderation_report.csv --llm
+python .\xhs_comment_moderator.py .\xhs_browser_comments.csv -o .\xhs_browser_moderation_report.csv
 ```
 
-浏览器脚本会保存截图到 `xhs_browser_screenshots`，网页端提取失败时可以走 OCR。
+## 高级用法：OCR 截图转评论
 
-## OCR 截图转评论
-
-对单张截图或截图文件夹运行：
+如果网页端采集失败，但你有评论区截图，可以对单张截图或截图文件夹运行：
 
 ```powershell
 python .\xhs_ocr_to_comments.py .\xhs_browser_screenshots -o .\xhs_ocr_comments.csv
@@ -173,16 +202,16 @@ python .\xhs_ocr_to_comments.py .\xhs_browser_screenshots -o .\xhs_ocr_comments.
 再审核 OCR 结果：
 
 ```powershell
-python .\xhs_comment_moderator.py .\xhs_ocr_comments.csv -o .\xhs_moderation_report.csv --llm
+python .\xhs_comment_moderator.py .\xhs_ocr_comments.csv -o .\xhs_moderation_report.csv
 ```
 
-OCR 会同时输出原始文本文件，方便检查识别错误：
+OCR 需要额外安装 Tesseract OCR 主程序和中文简体语言包 `chi_sim`。OCR 会同时输出原始文本文件，方便检查识别错误：
 
 ```text
 xhs_ocr_raw.txt
 ```
 
-## 监控评论来源
+## 高级用法：监控评论来源
 
 复制配置：
 
@@ -289,8 +318,5 @@ DeepSeek 复核会返回结构化判断，包括风险等级、置信度、分�
 
 - 评论采集
 - 风险识别
-- 新增评论监控
 - 高风险评论留痕
 - 人工复核前的预筛选
-
-如果评论里包含手机号、地址、身份证等隐私信息，开启大模型复核前建议先脱敏。
