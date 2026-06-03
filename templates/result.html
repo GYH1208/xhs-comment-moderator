@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}检测结果 - 小红书评论检测{% endblock %}
+
+{% block content %}
+<section class="summary">
+  <div>
+    <p class="eyebrow">检测结果</p>
+    <h1>{{ job.risky_count }} 条评论需要关注</h1>
+    <p class="job-url">{{ job.url }}</p>
+  </div>
+  <a class="button-link" href="{{ url_for('download_report', job_id=job.id) }}">导出报告</a>
+</section>
+
+<div class="metrics">
+  <div><strong>{{ job.comment_count }}</strong><span>采集评论</span></div>
+  <div><strong>{{ job.risky_count }}</strong><span>风险评论</span></div>
+  <div><strong>{{ job.feedback_count }}</strong><span>普通反馈</span></div>
+  <div><strong>{{ job.clean_count }}</strong><span>未命中</span></div>
+</div>
+
+<section class="section">
+  <h2>优先处理</h2>
+  {% if risky_rows %}
+    <div class="comment-list">
+      {% for row in risky_rows %}
+        <article class="comment-card risk-{{ row.risk_level }}">
+          <div class="comment-head">
+            <span class="badge">{{ row.risk_level }}</span>
+            <strong>{{ row.categories }}</strong>
+          </div>
+          <p>{{ row.comment }}</p>
+          <dl>
+            <dt>建议</dt>
+            <dd>{{ row.action }}</dd>
+            <dt>原因</dt>
+            <dd>{{ row.reasons }}</dd>
+          </dl>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">这次没有发现需要优先处理的评论。</div>
+  {% endif %}
+</section>
+
+{% if other_rows %}
+<section class="section">
+  <details>
+    <summary>查看普通反馈和未命中评论（{{ other_rows|length }}）</summary>
+    <div class="comment-list compact">
+      {% for row in other_rows %}
+        <article class="comment-card">
+          <div class="comment-head">
+            <span class="badge muted">{{ row.risk_level }}</span>
+            <strong>{{ row.categories }}</strong>
+          </div>
+          <p>{{ row.comment }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  </details>
+</section>
+{% endif %}
+{% endblock %}

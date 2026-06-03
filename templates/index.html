@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}新检测 - 小红书评论检测{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">本地网页工具</p>
+    <h1>粘贴帖子链接，检测恶意评论</h1>
+    <p class="lede">系统会打开小红书网页，请在弹出的浏览器里登录或确认页面，然后回到这里继续检测。</p>
+  </div>
+</section>
+
+<form class="start-form" action="{{ url_for('start_job') }}" method="post">
+  <label for="url">小红书帖子链接</label>
+  <div class="url-row">
+    <input id="url" name="url" type="url" placeholder="https://www.xiaohongshu.com/..." required>
+    <button type="submit">开始检测</button>
+  </div>
+</form>
+
+{% if recent_jobs %}
+<section class="section">
+  <div class="section-head">
+    <h2>最近检测</h2>
+    <a href="{{ url_for('history') }}">查看全部</a>
+  </div>
+  <div class="job-list">
+    {% for job in recent_jobs %}
+      <a class="job-row" href="{{ url_for('result' if job.status == 'done' else 'job_page', job_id=job.id) }}">
+        <span>
+          <strong>{{ job.url }}</strong>
+          <small>{{ job.created_at }} · {{ job.message }}</small>
+        </span>
+        <b>{{ job.risky_count or 0 }} 条风险</b>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

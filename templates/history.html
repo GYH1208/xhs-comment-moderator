@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}历史记录 - 小红书评论检测{% endblock %}
+
+{% block content %}
+<section class="section">
+  <h1>历史记录</h1>
+  {% if jobs %}
+    <div class="job-list">
+      {% for job in jobs %}
+        <a class="job-row" href="{{ url_for('result' if job.status == 'done' else 'job_page', job_id=job.id) }}">
+          <span>
+            <strong>{{ job.url }}</strong>
+            <small>{{ job.created_at }} · {{ job.message }}</small>
+          </span>
+          <b>{{ job.risky_count or 0 }} 条风险</b>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty">还没有检测记录。</div>
+  {% endif %}
+</section>
+{% endblock %}

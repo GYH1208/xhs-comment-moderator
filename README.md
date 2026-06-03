@@ -20,6 +20,7 @@
 ```text
 xhs_comment_moderator.py        # 评论审核主脚本
 xhs_browser_collect.py          # 浏览器自动化采集网页可见评论
+xhs_ui_app.py                   # 本地网页 UI，适合同事使用
 xhs_ocr_to_comments.py          # 评论截图 OCR 转 CSV
 xhs_monitor.py                  # 定时监控本地评论来源
 xhs_monitor_config.example.json # 监控配置示例
@@ -45,6 +46,33 @@ python -m playwright install chromium
 如果要使用 OCR，需要额外安装 Tesseract OCR 主程序和中文简体语言包 `chi_sim`。Python 包 `pillow` 和 `pytesseract` 已在 `requirements.txt` 中。
 
 ## 快速开始
+
+### 给同事使用：本地网页
+
+启动本地网页：
+
+```powershell
+python .\xhs_ui_app.py
+```
+
+然后打开：
+
+```text
+http://127.0.0.1:5000
+```
+
+使用流程：
+
+1. 在网页里粘贴小红书帖子链接。
+2. 点击“开始检测”。
+3. 系统会弹出一个浏览器窗口。如果需要登录、验证或手动打开评论区，请先在弹出的浏览器里处理好。
+4. 回到网页，点击“我已打开评论区，继续检测”。
+5. 等待系统自动滚动采集评论并生成审核结果。
+6. 在结果页查看需要优先处理的评论，必要时导出 CSV 报告。
+
+检测历史、截图和报告会保存在本地 `xhs_ui_data/` 目录，不会提交到 GitHub。
+
+### 命令行审核
 
 用示例评论跑一次本地审核：
 

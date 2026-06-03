@@ -13,8 +13,8 @@ import csv
 import re
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 
 COMMENT_SELECTORS = [
@@ -26,6 +26,21 @@ COMMENT_SELECTORS = [
     ".comment-item-container",
     ".comment-list",
 ]
+
+
+@dataclass
+class BrowserCollectionSettings:
+    url: str
+    profile_dir: Path = Path(".xhs_browser_profile")
+    screenshot_dir: Path = Path("xhs_browser_screenshots")
+    scrolls: int = 20
+    pause_ms: int = 1200
+    scroll_pixels: int = 900
+    screenshot_every: int = 5
+    timeout_ms: int = 60000
+    width: int = 1280
+    height: int = 900
+    headless: bool = False
 
 
 def normalize_text(text: str) -> str:
@@ -98,27 +113,118 @@ def write_csv(path: Path, comments: list[str], url: str) -> None:
             writer.writerow({"url": url, "comment_index": index, "comment": comment})
 
 
-def collect_comments(args: argparse.Namespace) -> list[str]:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise RuntimeError(
-            "缺少 Python Playwright。请先运行: pip install playwright && python -m playwright install chromium"
-        ) from exc
+def read_visible_comment_texts(page: object) -> list[str]:
+    selector_script = """
+    (selectors) => {
+      const visible = (el) => {
+        const style = window.getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        return style && style.visibility !== 'hidden' &&
+          style.display !== 'none' && rect.width > 0 && rect.height > 0;
+      };
+      const nodes = [];
+      for (const selector of selectors) {
+        document.querySelectorAll(selector).forEach((el) => {
+          if (visible(el)) nodes.push(el.innerText || el.textContent || '');
+        });
+      }
+      if (nodes.length === 0) {
+        nodes.push(document.body.innerText || '');
+      }
+      return nodes;
+    }
+    """
+    return page.evaluate(selector_script, COMMENT_SELECTORS)
 
-    profile_dir = args.profile_dir.resolve()
-    screenshot_dir = args.screenshot_dir.resolve()
-    screenshot_dir.mkdir(parents=True, exist_ok=True)
 
-    with sync_playwright() as playwright:
-        context = playwright.chromium.launch_persistent_context(
+def collect_from_open_page(page: object, settings: BrowserCollectionSettings) -> list[str]:
+    settings.screenshot_dir.mkdir(parents=True, exist_ok=True)
+    all_raw_texts: list[str] = []
+
+    for step in range(settings.scrolls + 1):
+        page.wait_for_timeout(settings.pause_ms)
+        raw_texts = read_visible_comment_texts(page)
+        all_raw_texts.extend(raw_texts)
+
+        if step in {0, settings.scrolls} or step % settings.screenshot_every == 0:
+            page.screenshot(
+                path=str(settings.screenshot_dir / f"xhs_browser_step_{step:03d}.png"),
+                full_page=False,
+            )
+
+        page.mouse.wheel(0, settings.scroll_pixels)
+
+    return extract_comment_candidates(all_raw_texts)
+
+
+class BrowserCollector:
+    def __init__(self, settings: BrowserCollectionSettings) -> None:
+        self.settings = settings
+        self._playwright = None
+        self._context = None
+        self._page = None
+
+    def open(self) -> None:
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError as exc:
+            raise RuntimeError(
+                "缺少 Python Playwright。请先运行: pip install playwright && python -m playwright install chromium"
+            ) from exc
+
+        profile_dir = self.settings.profile_dir.resolve()
+        self.settings.screenshot_dir = self.settings.screenshot_dir.resolve()
+        self.settings.screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        self._playwright = sync_playwright().start()
+        self._context = self._playwright.chromium.launch_persistent_context(
             user_data_dir=str(profile_dir),
-            headless=args.headless,
-            viewport={"width": args.width, "height": args.height},
+            headless=self.settings.headless,
+            viewport={"width": self.settings.width, "height": self.settings.height},
             locale="zh-CN",
         )
-        page = context.new_page()
-        page.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout_ms)
+        self._page = self._context.new_page()
+        self._page.goto(
+            self.settings.url,
+            wait_until="domcontentloaded",
+            timeout=self.settings.timeout_ms,
+        )
+
+    def collect(self) -> list[str]:
+        if self._page is None:
+            raise RuntimeError("浏览器还没有打开。")
+        return collect_from_open_page(self._page, self.settings)
+
+    def close(self) -> None:
+        if self._context is not None:
+            self._context.close()
+            self._context = None
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
+        self._page = None
+
+
+def settings_from_args(args: argparse.Namespace) -> BrowserCollectionSettings:
+    return BrowserCollectionSettings(
+        url=args.url,
+        profile_dir=args.profile_dir,
+        screenshot_dir=args.screenshot_dir,
+        scrolls=args.scrolls,
+        pause_ms=args.pause_ms,
+        scroll_pixels=args.scroll_pixels,
+        screenshot_every=args.screenshot_every,
+        timeout_ms=args.timeout_ms,
+        width=args.width,
+        height=args.height,
+        headless=args.headless,
+    )
+
+
+def collect_comments(args: argparse.Namespace) -> list[str]:
+    collector = BrowserCollector(settings_from_args(args))
+    try:
+        collector.open()
 
         if args.wait_for_enter:
             print("浏览器已打开。请在浏览器里登录/确认页面，并打开到评论区。")
@@ -133,44 +239,9 @@ def collect_comments(args: argparse.Namespace) -> list[str]:
                 if remaining > 0:
                     print(f"还剩 {remaining} 秒开始采集...")
 
-        all_raw_texts: list[str] = []
-        for step in range(args.scrolls + 1):
-            page.wait_for_timeout(args.pause_ms)
-
-            selector_script = """
-            (selectors) => {
-              const visible = (el) => {
-                const style = window.getComputedStyle(el);
-                const rect = el.getBoundingClientRect();
-                return style && style.visibility !== 'hidden' &&
-                  style.display !== 'none' && rect.width > 0 && rect.height > 0;
-              };
-              const nodes = [];
-              for (const selector of selectors) {
-                document.querySelectorAll(selector).forEach((el) => {
-                  if (visible(el)) nodes.push(el.innerText || el.textContent || '');
-                });
-              }
-              if (nodes.length === 0) {
-                nodes.push(document.body.innerText || '');
-              }
-              return nodes;
-            }
-            """
-            raw_texts: list[str] = page.evaluate(selector_script, COMMENT_SELECTORS)
-            all_raw_texts.extend(raw_texts)
-
-            if step in {0, args.scrolls} or step % args.screenshot_every == 0:
-                page.screenshot(
-                    path=str(screenshot_dir / f"xhs_browser_step_{step:03d}.png"),
-                    full_page=False,
-                )
-
-            page.mouse.wheel(0, args.scroll_pixels)
-
-        context.close()
-
-    return extract_comment_candidates(all_raw_texts)
+        return collector.collect()
+    finally:
+        collector.close()
 
 
 def parse_args() -> argparse.Namespace:

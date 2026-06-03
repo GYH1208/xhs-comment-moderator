@@ -12,6 +12,7 @@ xhs_monitor_state*.json
 xhs_monitor_reports*/
 xhs_browser_comments.csv
 xhs_browser_screenshots/
+xhs_ui_data/
 .xhs_browser_profile/
 
 # Local user config
