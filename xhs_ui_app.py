@@ -34,13 +34,15 @@ PROFILE_DIR = Path(".xhs_browser_profile")
 RISK_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "feedback": 4, "clean": 5}
 RISKY_LEVELS = {"critical", "high", "medium", "low"}
 LLM_MODES = {"all", "uncertain", "risky"}
+COLLECTION_INTENSITIES = {"standard", "deep"}
 DEFAULT_MODEL_SETTINGS = {
-    "enabled": False,
+    "enabled": True,
     "api_key": "",
     "model": "deepseek-v4-flash",
     "base_url": "https://api.deepseek.com",
-    "llm_mode": "uncertain",
-    "max_llm_comments": 20,
+    "llm_mode": "all",
+    "max_llm_comments": 0,
+    "collection_intensity": "standard",
 }
 
 app = Flask(__name__)
@@ -101,6 +103,8 @@ def load_model_settings() -> dict[str, Any]:
     settings.update({key: saved[key] for key in settings.keys() if key in saved})
     if settings["llm_mode"] not in LLM_MODES:
         settings["llm_mode"] = DEFAULT_MODEL_SETTINGS["llm_mode"]
+    if settings["collection_intensity"] not in COLLECTION_INTENSITIES:
+        settings["collection_intensity"] = DEFAULT_MODEL_SETTINGS["collection_intensity"]
     try:
         settings["max_llm_comments"] = int(settings["max_llm_comments"])
     except (TypeError, ValueError):
@@ -124,6 +128,13 @@ def parse_model_settings_form(form: Any, current: dict[str, Any]) -> tuple[dict[
     if llm_mode not in LLM_MODES:
         return current, "复核范围无效。"
 
+    collection_intensity = form.get(
+        "collection_intensity",
+        DEFAULT_MODEL_SETTINGS["collection_intensity"],
+    ).strip()
+    if collection_intensity not in COLLECTION_INTENSITIES:
+        return current, "采集强度无效。"
+
     base_url = form.get("base_url", DEFAULT_MODEL_SETTINGS["base_url"]).strip().rstrip("/")
     if not re.match(r"^https?://", base_url):
         return current, "Base URL 需要以 http:// 或 https:// 开头。"
@@ -144,6 +155,7 @@ def parse_model_settings_form(form: Any, current: dict[str, Any]) -> tuple[dict[
         "base_url": base_url,
         "llm_mode": llm_mode,
         "max_llm_comments": max_llm_comments,
+        "collection_intensity": collection_intensity,
     }
     if settings["enabled"] and not settings["api_key"]:
         return current, "启用模型复核前需要填写 API Key。"
@@ -156,7 +168,9 @@ def save_model_settings(settings: dict[str, Any]) -> None:
 
 def model_status_label(settings: dict[str, Any]) -> str:
     if settings.get("enabled") and settings.get("api_key"):
-        return f"已启用模型复核：{settings.get('model')}"
+        return f"强制模型复核：{settings.get('model')}"
+    if settings.get("enabled"):
+        return "强制模型复核：缺少 API Key"
     return "仅使用本地规则"
 
 
@@ -168,6 +182,29 @@ def build_llm_moderator(settings: dict[str, Any]) -> moderator.LlmModerator | No
         model=str(settings["model"]),
         base_url=str(settings["base_url"]),
     )
+
+
+def force_model_review_enabled(settings: dict[str, Any]) -> bool:
+    return bool(settings.get("enabled"))
+
+
+def max_llm_comments_value(settings: dict[str, Any]) -> int | None:
+    value = int(settings.get("max_llm_comments", 0) or 0)
+    return None if value == 0 else value
+
+
+def collection_settings_for_job(url: str, job_id: str, settings: dict[str, Any]) -> browser_collect.BrowserCollectionSettings:
+    browser_settings = browser_collect.BrowserCollectionSettings(
+        url=url,
+        profile_dir=PROFILE_DIR,
+        screenshot_dir=job_dir(job_id) / "screenshots",
+    )
+    if settings.get("collection_intensity") == "deep":
+        browser_settings.scrolls = 40
+        browser_settings.pause_ms = 1500
+        browser_settings.scroll_pixels = 800
+        browser_settings.screenshot_every = 8
+    return browser_settings
 
 
 def load_job(job_id: str) -> dict[str, Any]:
@@ -224,6 +261,8 @@ def classify_comments(
     settings = settings or load_model_settings()
     llm_moderator = llm_factory(settings)
     if not llm_moderator:
+        if force_model_review_enabled(settings):
+            raise RuntimeError("强制模型复核已启用，请先配置模型 API Key。")
         return sort_rows(moderator.build_rows(comment_objects)), None
 
     try:
@@ -231,10 +270,12 @@ def classify_comments(
             comment_objects,
             llm_moderator=llm_moderator,
             llm_mode=str(settings["llm_mode"]),
-            max_llm_comments=int(settings["max_llm_comments"]),
+            max_llm_comments=max_llm_comments_value(settings),
         )
         return sort_rows(rows), None
     except Exception as exc:
+        if force_model_review_enabled(settings):
+            raise RuntimeError(f"模型复核失败，未生成完整审核结论：{exc}") from exc
         rows = moderator.build_rows(comment_objects)
         return sort_rows(rows), f"模型复核失败，已使用本地规则生成结果：{exc}"
 
@@ -263,12 +304,9 @@ def create_job(url: str) -> dict[str, Any]:
 def run_job(job_id: str) -> None:
     job = load_job(job_id)
     event = _job_events[job_id]
-    settings = browser_collect.BrowserCollectionSettings(
-        url=job["url"],
-        profile_dir=PROFILE_DIR,
-        screenshot_dir=job_dir(job_id) / "screenshots",
-    )
-    collector = browser_collect.BrowserCollector(settings)
+    model_settings = load_model_settings()
+    browser_settings = collection_settings_for_job(job["url"], job_id, model_settings)
+    collector = browser_collect.BrowserCollector(browser_settings)
 
     try:
         update_job(job_id, status="opening", message="正在打开小红书页面")
@@ -283,7 +321,6 @@ def run_job(job_id: str) -> None:
         comments = collector.collect()
 
         update_job(job_id, status="reviewing", message="正在识别风险评论")
-        model_settings = load_model_settings()
         rows, warning = classify_comments(comments, job["url"], settings=model_settings)
         counts = count_rows(rows)
         save_json(rows_json_path(job_id), rows)
@@ -293,6 +330,7 @@ def run_job(job_id: str) -> None:
             status="done",
             message="检测完成",
             model_status=model_status_label(model_settings),
+            audit_complete=not warning,
             warning=warning or "",
             **counts,
         )
@@ -343,6 +381,10 @@ def start_job() -> Any:
     if not valid_xhs_url(url):
         flash("请输入有效的小红书帖子链接。")
         return redirect(url_for("index"))
+    settings = load_model_settings()
+    if force_model_review_enabled(settings) and not settings.get("api_key"):
+        flash("请先配置模型 API Key，强制模型复核完成后才能开始全自动审核。")
+        return redirect(url_for("model_settings_page"))
 
     job = create_job(url)
     start_background_job(job)
