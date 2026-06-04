@@ -163,20 +163,20 @@ JSON 可以是数组：
 
 ## 大模型语义复核
 
-如果你希望识别更隐晦的嘲讽、反讽、带节奏、恶意揣测，可以开启大模型复核。默认使用 DeepSeek 的 OpenAI-compatible Chat Completions 接口和 JSON Output。
+如果你希望识别更隐晦的嘲讽、反讽、带节奏、恶意揣测，可以开启大模型复核。默认使用 OpenAI-compatible Chat Completions 接口和 JSON Output，可以接 OpenAI、DeepSeek、中转网关或公司内部兼容服务。
 
 先设置 API Key：
 
 ```powershell
-$env:DEEPSEEK_API_KEY="你的 DeepSeek API Key"
+$env:MODEL_API_KEY="你的模型 API Key"
 ```
 
 或者在项目根目录新建 `.env` 文件：
 
 ```env
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
-DEEPSEEK_MODEL=deepseek-v4-flash
-DEEPSEEK_BASE_URL=https://api.deepseek.com
+MODEL_API_KEY=你的模型 API Key
+MODEL_NAME=gpt-4o-mini
+MODEL_BASE_URL=https://api.openai.com/v1
 ```
 
 然后运行：
@@ -188,7 +188,7 @@ python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_
 可选参数：
 
 ```powershell
-python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_report.csv --llm --llm-model deepseek-v4-flash --llm-mode all
+python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_report.csv --llm --llm-model gpt-4o-mini --llm-mode all
 ```
 
 `--llm-mode` 支持：
@@ -215,9 +215,11 @@ python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_
 
 默认配置：
 
-- `DEEPSEEK_API_KEY`：DeepSeek API Key
-- `DEEPSEEK_MODEL`：默认 `deepseek-v4-flash`
-- `DEEPSEEK_BASE_URL`：默认 `https://api.deepseek.com`
+- `MODEL_API_KEY`：模型 API Key
+- `MODEL_NAME`：默认 `gpt-4o-mini`
+- `MODEL_BASE_URL`：默认 `https://api.openai.com/v1`
+
+旧的 `DEEPSEEK_API_KEY`、`DEEPSEEK_MODEL`、`DEEPSEEK_BASE_URL` 仍然兼容。
 
 ## 后续可以加的能力
 

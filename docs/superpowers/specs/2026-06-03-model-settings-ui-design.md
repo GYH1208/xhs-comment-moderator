@@ -6,7 +6,7 @@ Add a local web UI settings window so coworkers can configure semantic model rev
 
 ## Scope
 
-The first version supports one OpenAI-compatible DeepSeek configuration for the local web UI. It does not add user accounts, cloud sharing, multi-provider presets, or encrypted credential storage. Settings are local to the machine running the app.
+The first version supports one OpenAI-compatible model configuration for the local web UI. It does not add user accounts, cloud sharing, multi-provider presets, or encrypted credential storage. Settings are local to the machine running the app.
 
 ## User Experience
 
@@ -14,8 +14,8 @@ The top navigation includes "模型配置". The settings page lets the user:
 
 - Enable or disable model review.
 - Enter an API Key.
-- Edit the model name, defaulting to `deepseek-v4-flash`.
-- Edit the base URL, defaulting to `https://api.deepseek.com`.
+- Edit the model name, defaulting to `gpt-4o-mini`.
+- Edit the base URL, defaulting to `https://api.openai.com/v1`.
 - Choose review mode: all comments, uncertain comments, or risky comments.
 - Set an optional maximum number of comments sent to the model.
 - Save settings.

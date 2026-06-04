@@ -38,8 +38,8 @@ COLLECTION_INTENSITIES = {"standard", "deep"}
 DEFAULT_MODEL_SETTINGS = {
     "enabled": True,
     "api_key": "",
-    "model": "deepseek-v4-flash",
-    "base_url": "https://api.deepseek.com",
+    "model": "gpt-4o-mini",
+    "base_url": "https://api.openai.com/v1",
     "llm_mode": "all",
     "max_llm_comments": 0,
     "collection_intensity": "standard",

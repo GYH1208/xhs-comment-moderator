@@ -255,7 +255,7 @@ class LlmModerator:
         self,
         api_key: str,
         model: str,
-        base_url: str = "https://api.deepseek.com",
+        base_url: str = "https://api.openai.com/v1",
         timeout: int = 60,
     ) -> None:
         self.api_key = api_key
@@ -323,7 +323,7 @@ class LlmModerator:
             raise RuntimeError(f"LLM API returned no output text: {data}")
         result = json.loads(text)
         result = validate_llm_result(result)
-        result["provider"] = "deepseek_chat_completions"
+        result["provider"] = "openai_compatible_chat_completions"
         result["model"] = self.model
         return result
 
@@ -665,22 +665,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--llm",
         action="store_true",
-        help="Enable LLM semantic review. Requires DEEPSEEK_API_KEY by default.",
+        help=(
+            "Enable LLM semantic review. Requires MODEL_API_KEY "
+            "or the legacy DEEPSEEK_API_KEY."
+        ),
     )
     parser.add_argument(
         "--llm-model",
-        default=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+        default=os.getenv("MODEL_NAME", os.getenv("DEEPSEEK_MODEL", "gpt-4o-mini")),
         help=(
-            "DeepSeek model for semantic review. Defaults to DEEPSEEK_MODEL "
-            "or deepseek-v4-flash."
+            "OpenAI-compatible model for semantic review. Defaults to MODEL_NAME, "
+            "legacy DEEPSEEK_MODEL, or gpt-4o-mini."
         ),
     )
     parser.add_argument(
         "--llm-base-url",
-        default=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+        default=os.getenv(
+            "MODEL_BASE_URL",
+            os.getenv("DEEPSEEK_BASE_URL", "https://api.openai.com/v1"),
+        ),
         help=(
-            "DeepSeek OpenAI-compatible base URL. Defaults to DEEPSEEK_BASE_URL "
-            "or https://api.deepseek.com."
+            "OpenAI-compatible base URL. Defaults to MODEL_BASE_URL, "
+            "legacy DEEPSEEK_BASE_URL, or https://api.openai.com/v1."
         ),
     )
     parser.add_argument(
@@ -704,9 +710,12 @@ def main() -> None:
     comments = load_comments(args.input)
     llm_moderator = None
     if args.llm:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
+        api_key = os.getenv("MODEL_API_KEY", os.getenv("DEEPSEEK_API_KEY", ""))
         if not api_key:
-            raise RuntimeError("启用 --llm 需要先设置环境变量 DEEPSEEK_API_KEY。")
+            raise RuntimeError(
+                "启用 --llm 需要先设置环境变量 MODEL_API_KEY "
+                "或兼容旧配置 DEEPSEEK_API_KEY。"
+            )
         llm_moderator = LlmModerator(
             api_key=api_key,
             model=args.llm_model,

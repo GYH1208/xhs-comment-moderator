@@ -6,7 +6,7 @@
 
 **Architecture:** Extend existing `xhs_ui_app.py` settings and classification helpers. Keep local-rule-only behavior available only when model review is disabled.
 
-**Tech Stack:** Python 3, Flask, unittest, existing DeepSeek-compatible moderation client.
+**Tech Stack:** Python 3, Flask, unittest, existing OpenAI-compatible moderation client.
 
 ---
 

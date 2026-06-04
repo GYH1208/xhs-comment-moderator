@@ -10,7 +10,7 @@
 - 自动识别辱骂、威胁、广告引流、隐私泄露、造谣、嘲讽/阴阳怪气等风险
 - 在本地网页里查看需要优先处理的评论
 - 导出 CSV 报告，方便留痕和复核
-- 可选接入 DeepSeek 做语义复核
+- 可接入任意 OpenAI-compatible 模型做语义复核
 - 保留命令行、OCR、定时监控等高级用法
 
 ## 给同事使用：本地网页
@@ -56,13 +56,20 @@ http://127.0.0.1:5000
 
 - 是否启用强制模型复核
 - API Key
-- 模型名，默认 `deepseek-v4-flash`
-- Base URL，默认 `https://api.deepseek.com`
+- 模型名，默认 `gpt-4o-mini`
+- Base URL，默认 `https://api.openai.com/v1`
 - 复核范围，默认全部评论
 - 最大复核条数，填 `0` 表示不限制
 - 采集强度：标准 / 深度
 
 保存后，后续检测会自动使用这个配置。API Key 保存在本机 `xhs_ui_data/settings.json`，页面只显示脱敏后的 Key。也可以点击“测试连接”确认配置是否可用。
+
+常见 Base URL 示例：
+
+- OpenAI：`https://api.openai.com/v1`
+- DeepSeek：`https://api.deepseek.com`
+- 中转网关：填写网关提供的 OpenAI-compatible 地址
+- 公司内部服务：填写内部兼容 `/chat/completions` 的服务地址
 
 强制模型复核只覆盖已经采集到的评论。如果网页没有展示某条评论，模型不会看到它。担心漏采时，可以把采集强度调成“深度”。
 
@@ -72,7 +79,7 @@ http://127.0.0.1:5000
 - **检测中**：显示当前步骤。需要人工登录或打开评论区时，页面会提示你继续。
 - **检测结果**：优先展示风险评论，普通反馈和未命中评论放在折叠区。
 - **历史记录**：查看最近检测过的帖子和结果。
-- **模型配置**：配置强制 DeepSeek 语义复核、模型、Base URL、复核范围、调用上限和采集强度。
+- **模型配置**：配置强制模型复核、模型名、Base URL、复核范围、调用上限和采集强度。
 
 风险评论会按严重程度排序：`critical`、`high`、`medium`、`low`。
 
@@ -121,7 +128,7 @@ xhs_ocr_to_comments.py          # 评论截图 OCR 转 CSV
 xhs_monitor.py                  # 定时监控本地评论来源
 xhs_monitor_config.example.json # 监控配置示例
 sample_xhs_comments.csv         # 示例评论数据
-.env.example                    # DeepSeek 配置模板
+.env.example                    # 模型配置模板
 requirements.txt                # Python 依赖
 templates/                      # 网页模板
 static/                         # 网页样式和脚本
@@ -153,7 +160,7 @@ llm_reason
 
 不开 `--llm` 时，`llm_*` 字段为空。
 
-## 配置 DeepSeek 语义复核
+## 配置 OpenAI-compatible 模型复核
 
 日常使用推荐在网页顶部的“模型配置”里填写。下面是命令行方式，适合高级用户或批处理脚本。
 
@@ -166,10 +173,12 @@ Copy-Item .\.env.example .\.env
 编辑 `.env`：
 
 ```env
-DEEPSEEK_API_KEY=你的 DeepSeek API Key
-DEEPSEEK_MODEL=deepseek-v4-flash
-DEEPSEEK_BASE_URL=https://api.deepseek.com
+MODEL_API_KEY=你的模型 API Key
+MODEL_NAME=gpt-4o-mini
+MODEL_BASE_URL=https://api.openai.com/v1
 ```
+
+如果使用 DeepSeek 或其他 OpenAI-compatible 服务，只需要把 `MODEL_NAME` 和 `MODEL_BASE_URL` 换成对应服务提供的值。
 
 开启大模型复核：
 
@@ -191,7 +200,7 @@ python .\xhs_comment_moderator.py .\sample_xhs_comments.csv -o .\xhs_moderation_
 
 `--llm-mode` 支持：
 
-- `all`：全部评论交给 DeepSeek 复核
+- `all`：全部评论交给模型复核
 - `uncertain`：复核本地规则认为低到中风险的评论
 - `risky`：复核本地规则已判定为中高风险的评论
 
@@ -319,7 +328,7 @@ JSON 可以是数组：
 ```text
 本地规则初筛
   -> 本地嘲讽/阴阳怪气弱语义规则
-  -> DeepSeek 语义复核
+  -> OpenAI-compatible 模型语义复核
   -> 合并最终风险等级
 ```
 
@@ -330,7 +339,7 @@ JSON 可以是数组：
 - 引号嘲讽：`所谓“专家”`
 - 恶意揣测动机：`又开始恰饭洗白了`
 
-Web UI 默认要求 DeepSeek 完成复核后才生成完整审核结果。命令行模式仍然可以通过 `--llm` 自行决定是否启用模型。DeepSeek 复核会返回结构化判断，包括风险等级、置信度、分类、建议动作和理由。脚本只在模型置信度足够时提升风险等级，避免把正常批评误判为恶意。
+Web UI 默认要求模型完成复核后才生成完整审核结果。命令行模式仍然可以通过 `--llm` 自行决定是否启用模型。模型复核会返回结构化判断，包括风险等级、置信度、分类、建议动作和理由。脚本只在模型置信度足够时提升风险等级，避免把正常批评误判为恶意。
 
 ## 安全边界
 

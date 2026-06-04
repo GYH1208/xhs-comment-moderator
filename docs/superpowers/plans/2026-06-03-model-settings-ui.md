@@ -6,7 +6,7 @@
 
 **Architecture:** Store UI-specific settings in `xhs_ui_data/settings.json`. Add settings routes and templates to `xhs_ui_app.py`, then use configured `LlmModerator` during `classify_comments`.
 
-**Tech Stack:** Python 3, Flask, unittest, existing DeepSeek-compatible moderation client.
+**Tech Stack:** Python 3, Flask, unittest, existing OpenAI-compatible moderation client.
 
 ---
 

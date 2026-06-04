@@ -6,7 +6,7 @@
 <section class="panel">
   <p class="eyebrow">模型配置</p>
   <h1>设置强制模型复核</h1>
-  <p class="lede">启用后，每条已采集评论都必须完成模型复核。模型不可用时，本次检测不会生成完整审核结论。</p>
+  <p class="lede">启用后，每条已采集评论都必须通过 OpenAI-compatible 模型复核。模型不可用时，本次检测不会生成完整审核结论。</p>
 
   <form class="settings-form" action="{{ url_for('save_model_settings_page') }}" method="post">
     <label class="check-row">
@@ -23,6 +23,7 @@
 
     <label for="base_url">Base URL</label>
     <input id="base_url" name="base_url" type="url" value="{{ settings.base_url }}" required>
+    <p class="help-text">例如 OpenAI、DeepSeek、中转网关或公司内部兼容 `/chat/completions` 的服务地址。</p>
 
     <label for="llm_mode">复核范围</label>
     <select id="llm_mode" name="llm_mode">

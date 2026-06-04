@@ -108,8 +108,8 @@ class XhsUiAppTest(unittest.TestCase):
     def test_model_settings_default_to_local_rules(self) -> None:
         settings = xhs_ui_app.load_model_settings()
         self.assertTrue(settings["enabled"])
-        self.assertEqual(settings["model"], "deepseek-v4-flash")
-        self.assertEqual(settings["base_url"], "https://api.deepseek.com")
+        self.assertEqual(settings["model"], "gpt-4o-mini")
+        self.assertEqual(settings["base_url"], "https://api.openai.com/v1")
         self.assertEqual(settings["llm_mode"], "all")
         self.assertEqual(settings["max_llm_comments"], 0)
         self.assertEqual(settings["collection_intensity"], "standard")
@@ -121,8 +121,8 @@ class XhsUiAppTest(unittest.TestCase):
             data={
                 "enabled": "on",
                 "api_key": "sk-test-secret",
-                "model": "deepseek-v4-flash",
-                "base_url": "https://api.deepseek.com",
+                "model": "custom-model",
+                "base_url": "https://model-gateway.example.com/v1",
                 "llm_mode": "all",
                 "max_llm_comments": "12",
                 "collection_intensity": "deep",
@@ -135,6 +135,8 @@ class XhsUiAppTest(unittest.TestCase):
         settings = xhs_ui_app.load_model_settings()
         self.assertTrue(settings["enabled"])
         self.assertEqual(settings["api_key"], "sk-test-secret")
+        self.assertEqual(settings["model"], "custom-model")
+        self.assertEqual(settings["base_url"], "https://model-gateway.example.com/v1")
         self.assertEqual(settings["llm_mode"], "all")
         self.assertEqual(settings["max_llm_comments"], 12)
         self.assertEqual(settings["collection_intensity"], "deep")
@@ -145,8 +147,8 @@ class XhsUiAppTest(unittest.TestCase):
             data={
                 "enabled": "on",
                 "api_key": "sk-test-secret",
-                "model": "deepseek-v4-flash",
-                "base_url": "https://api.deepseek.com",
+                "model": "custom-model",
+                "base_url": "https://model-gateway.example.com/v1",
                 "llm_mode": "bad-mode",
                 "max_llm_comments": "12",
                 "collection_intensity": "standard",
@@ -171,8 +173,8 @@ class XhsUiAppTest(unittest.TestCase):
         settings = {
             "enabled": True,
             "api_key": "sk-test-secret",
-            "model": "deepseek-v4-flash",
-            "base_url": "https://api.deepseek.com",
+            "model": "custom-model",
+            "base_url": "https://model-gateway.example.com/v1",
             "llm_mode": "all",
             "max_llm_comments": 1,
         }
@@ -190,8 +192,8 @@ class XhsUiAppTest(unittest.TestCase):
         settings = {
             "enabled": True,
             "api_key": "",
-            "model": "deepseek-v4-flash",
-            "base_url": "https://api.deepseek.com",
+            "model": "custom-model",
+            "base_url": "https://model-gateway.example.com/v1",
             "llm_mode": "all",
             "max_llm_comments": 0,
             "collection_intensity": "standard",
@@ -212,8 +214,8 @@ class XhsUiAppTest(unittest.TestCase):
         settings = {
             "enabled": True,
             "api_key": "sk-test-secret",
-            "model": "deepseek-v4-flash",
-            "base_url": "https://api.deepseek.com",
+            "model": "custom-model",
+            "base_url": "https://model-gateway.example.com/v1",
             "llm_mode": "all",
             "max_llm_comments": 0,
             "collection_intensity": "standard",
@@ -239,8 +241,8 @@ class XhsUiAppTest(unittest.TestCase):
         settings = {
             "enabled": False,
             "api_key": "",
-            "model": "deepseek-v4-flash",
-            "base_url": "https://api.deepseek.com",
+            "model": "custom-model",
+            "base_url": "https://model-gateway.example.com/v1",
             "llm_mode": "all",
             "max_llm_comments": 0,
             "collection_intensity": "standard",
